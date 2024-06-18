@@ -18,3 +18,5 @@ Todo:
 - Gemini seems to do a decent job of learning from past mistakes (getting eaten by a GRU), but might be able to improve the prompt more
 - Consider summarizing prior games when the game ends and saving that to pass into future prompts
 - Drop the extra newlines from the accumulated output...it's ever-growing :-)
+
+![Alt text](/images/playing_game.png?raw=true "Gemini playing Zork Underground")
