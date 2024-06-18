@@ -4,7 +4,10 @@ Don't use quotes in the suggested action.
 Surround the action with **
 Explain the action to take.
 Don't use articles in the action.
-Don't repeat actions except going in a direction.
+When specifying a direction to move, use the verb "go".
 
-Game Text:
+Previous actions and responses from the game where your actions are denoted by '>':
+{zork_history}
+
+Most recent response from the game:
 {zork_output}
