@@ -8,12 +8,12 @@ from getch import getch
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def run_zork_command(command, child):
-    """Runs a command in Frotz using pexpect."""
+    """Runs a command in Frotz using pexpect, with a timeout."""
     child.sendline(command)
     try:
-        child.expect("> ", timeout=1)
+        child.expect("> ", timeout=1)  # Reduced timeout to 1 second
     except pexpect.TIMEOUT:
-        print(".")  # Visual indicator of timeout
+        print(".")
     return child.before.decode('utf-8', errors='replace').strip()
 
 def get_gemini_suggestion(zork_history, zork_output):
@@ -23,11 +23,10 @@ def get_gemini_suggestion(zork_history, zork_output):
     prompt = prompt_template.format(zork_history=zork_history, zork_output=zork_output)
 
     genai.configure(api_key=config.GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash') 
     try:
         response = model.generate_content(prompt)
-        
-        # Write suggestion and explanation to log file
+
         with open(config.LOG_FILE_PATH, 'a') as log:
             log.write(f"============ Gemini Suggestion:\n{response.text}\n-------------------\n")
 
@@ -36,46 +35,64 @@ def get_gemini_suggestion(zork_history, zork_output):
         logging.error(f"Error generating Gemini suggestion: {e}")
         return None  
 
-# Start Frotz process with -m and -q flags
-child = pexpect.spawn(f"dfrotz -m -q {config.ZORK_FILE_PATH}")
+def summarize_game(history):
+    """Asks Gemini to summarize the game based on the history."""
+    with open(config.SUMMARY_PROMPT_FILE_PATH, 'r') as f:  # Read prompt from file
+        summary_prompt_template = f.read()
 
-# Clear the log file at the start
-with open(config.LOG_FILE_PATH, 'w') as log:
-    log.write("#################################\n")
-    log.write("#######    NEW GAME   ###########\n")
-    log.write("#################################\n")
+    summary_prompt = summary_prompt_template.format(history=history)
+    genai.configure(api_key=config.GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    response = model.generate_content(summary_prompt)
 
-# Get the initial prompt
-zork_output = run_zork_command("", child)
-history = ""
+    return response.text
 
 # Main game loop
-while True:
-    response = get_gemini_suggestion(history, zork_output)
+def main():
+    child = pexpect.spawn(f"dfrotz -m -q {config.ZORK_FILE_PATH}")
+    zork_output = run_zork_command("", child)  # Get initial output
+    history = ""
 
-    if response is None:
-        print("Error getting suggestion from Gemini. Skipping this turn.")
-        continue
+    # Clear the log file at the start
+    with open(config.LOG_FILE_PATH, 'w') as log:
+        log.write("#################################\n")
+        log.write("#######    NEW GAME   ###########\n")
+        log.write("#################################\n")
 
-    try:
-        if response.candidates[0].finish_reason == "SAFETY":
-            logging.warning(f"Gemini flagged a safety issue:\n{response}")
-        else:
-            suggestion = response.text
-            action = suggestion.split("**")[1].split("**")[0].strip()
+    while True:
+        response = get_gemini_suggestion(history, zork_output)
 
-            zork_output = run_zork_command(action, child)
-            history = history + "\n" + zork_output
-            print(zork_output)
+        if response is None:
+            print("Error getting suggestion from Gemini. Skipping this turn.")
+            continue
+        
+        try:
+            if response.candidates[0].finish_reason == "SAFETY":
+                logging.warning(f"Gemini flagged a safety issue:\n{response}")
+            else:
+                suggestion = response.text
+                action = suggestion.split("**")[1].split("**")[0].strip()
 
-    except Exception as e:
-        logging.error(f"Error parsing Gemini response: {e}")
-        print("Error processing response. Skipping this turn.")
+                zork_output = run_zork_command(action, child)  # Decreased timeout to 1
+                history = history + "\n" + zork_output
+                print(zork_output)
 
-    print("Continue playing? (n to stop): ", end='', flush=True)
-    choice = getch()
-    print(choice)
-    if choice.lower() == "n":
-        break
+        except Exception as e:
+            logging.error(f"Error parsing Gemini response: {e}")
+            print("Error processing response. Skipping this turn.")
 
-child.terminate()
+        # Check for game end
+        if "RESTART" in zork_output or "QUIT" in zork_output:
+            print(summarize_game(history))
+            break
+
+        print("Continue playing? (n to stop): ", end='', flush=True)
+        choice = getch()
+        print(choice)
+        if choice.lower() == "n":
+            break
+
+    child.terminate()
+
+if __name__ == "__main__":
+    main()

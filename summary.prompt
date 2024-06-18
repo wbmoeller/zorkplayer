@@ -1,0 +1,5 @@
+You are an AI assistant playing the text adventure game Zork. You have a log of the game's events:
+
+{history}
+
+Please summarize what happened in the game, including key actions, locations visited, reason for the game ending and any major obstacles or puzzles the player encountered.  
