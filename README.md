@@ -14,9 +14,8 @@ For running locally:
 
 Todo:
 - I get a timeout with pexpect every time.  haven't dug in yet
-- Zork underground will give an empty prompt if you go back to a location that you've been before. Gemini will often...but not always...figure out where it currently is based on the history. I think it'd be better if gemini periodically looked around in order to re-establish its location
 - Gemini seems to do a decent job of learning from past mistakes (getting eaten by a GRU), but might be able to improve the prompt more
-- Consider summarizing prior games when the game ends and saving that to pass into future prompts
+- Consider summarizing prior games when the game ends and saving that to pass into future prompts.  right now it "learns" from prior runs through the game within the same run of zp.py...but i think i can persist that learning across zp.py runs
 - Drop the extra newlines from the accumulated output...it's ever-growing :-)
 
 ![Alt text](/images/playing_game.png?raw=true "Gemini playing Zork Underground")
