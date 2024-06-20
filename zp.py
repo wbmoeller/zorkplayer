@@ -3,6 +3,7 @@ import pexpect
 import logging
 import google.generativeai as genai
 from getch import getch
+import sys
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -54,10 +55,19 @@ def summarize_game(history):
 
 # Main game loop
 def main():
-    child = pexpect.spawn(f"dfrotz -m -q {config.ZORK_FILE_PATH}")
-    zork_output = run_zork_command("", child)  # Get initial output
-    history = ""
+    # Parse command-line arguments
+    interactive_mode = False
+    for arg in sys.argv[1:]:
+        if arg == "-i":
+            interactive_mode = True
+        elif arg == "-h":
+            print("Usage: python zp.py [-i] [-h]")
+            print("-i: Interactive mode. Prompts the user after each turn.")
+            print("-h: Display this help message.")
+            return
 
+    child = pexpect.spawn(f"dfrotz -m -q {config.ZORK_FILE_PATH}")
+    
     # Clear the log file at the start
     with open(config.LOG_FILE_PATH, 'w') as log:
         log.write("#################################\n")
@@ -70,6 +80,10 @@ def main():
             past_summaries = f.read()
     except FileNotFoundError:
         past_summaries = ""
+
+    # Get the initial prompt
+    zork_output = run_zork_command("", child)  # Get initial output
+    history = ""
 
     while True:
         response = get_gemini_suggestion(history, zork_output, past_summaries)
@@ -98,11 +112,13 @@ def main():
             print(summarize_game(history))
             break
 
-        print("Continue playing? (n to stop): ", end='', flush=True)
-        choice = getch()
-        print(choice)
-        if choice.lower() == "n":
-            break
+        # Ask user if they want to continue (only in interactive mode)
+        if interactive_mode:
+            print("Continue playing? (n to stop): ", end='', flush=True)
+            choice = getch()
+            print(choice)
+            if choice.lower() == "n":
+                break
 
     child.terminate()
 
