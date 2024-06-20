@@ -21,7 +21,15 @@ I found the summary of summaries from Gemini to be entertaining:
 
 Todo:
 - I get a timeout with pexpect every time. haven't dug in yet
-- Tweak the prompt
+- Tried running it with the original zork...performance is pretty crummy. It gets stuck in the forest going in circles. It also gets stuck in the canyon (permanently) trying to climb down. I tried including the gemini thought process and it does _slightly_ better, but still gets stuck.
+- Abstract out the AI api
+- Swap from Gemini to OpenAI to see if it does any better
+- Ask gemini for architectural improvements
+- Consider moving the summary into a database
+- I think there's an AI architectural pattern this is implicitly following where the summaries are injected back into the next iteration. Officially separate that out into its own module
+- Abstract out the game interpreter into a module
+- Generate tests
+
 - Handle going back to a previuos location better. Zork doesn't print anything when you go back, you just get the prompt...and this often confuses Gemini about the current game state
 
 ![Alt text](/images/playing_game.png?raw=true "Gemini playing Zork Underground")
