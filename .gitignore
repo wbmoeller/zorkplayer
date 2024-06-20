@@ -1,4 +1,5 @@
 config.py
 __pycache__
 gemini_suggestions.log
+zork_summaries.txt
 **/.DS_Store

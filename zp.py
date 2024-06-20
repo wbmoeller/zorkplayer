@@ -16,14 +16,14 @@ def run_zork_command(command, child):
         print(".")
     return child.before.decode('utf-8', errors='replace').strip()
 
-def get_gemini_suggestion(zork_history, zork_output):
-    """Gets a suggested command from Gemini, logging to a file."""
+def get_gemini_suggestion(zork_history, zork_output, past_summaries):
+    """Gets a suggested command from Gemini, incorporating past summaries."""
     with open(config.PROMPT_FILE_PATH, 'r') as f:
         prompt_template = f.read()
-    prompt = prompt_template.format(zork_history=zork_history, zork_output=zork_output)
+    prompt = prompt_template.format(zork_history=zork_history, zork_output=zork_output, past_summaries=past_summaries)
 
     genai.configure(api_key=config.GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash') 
+    model = genai.GenerativeModel('gemini-1.5-flash')
     try:
         response = model.generate_content(prompt)
 
@@ -37,7 +37,7 @@ def get_gemini_suggestion(zork_history, zork_output):
 
 def summarize_game(history):
     """Asks Gemini to summarize the game based on the history."""
-    with open(config.SUMMARY_PROMPT_FILE_PATH, 'r') as f:  # Read prompt from file
+    with open(config.SUMMARY_PROMPT_FILE_PATH, 'r') as f:  
         summary_prompt_template = f.read()
 
     summary_prompt = summary_prompt_template.format(history=history)
@@ -45,7 +45,12 @@ def summarize_game(history):
     model = genai.GenerativeModel('gemini-1.5-flash')
     response = model.generate_content(summary_prompt)
 
-    return response.text
+    summary = response.text
+    with open(config.SUMMARY_FILE_PATH, 'a') as f:
+        f.write("-----------\n")  # Add separator before the summary
+        f.write(summary + "\n")  
+
+    return summary
 
 # Main game loop
 def main():
@@ -56,11 +61,18 @@ def main():
     # Clear the log file at the start
     with open(config.LOG_FILE_PATH, 'w') as log:
         log.write("#################################\n")
-        log.write("#######    NEW GAME   ###########\n")
+        log.write("#######  NEW GAME  ###########\n")
         log.write("#################################\n")
 
+    # Read past summaries
+    try:
+        with open(config.SUMMARY_FILE_PATH, 'r') as f:
+            past_summaries = f.read()
+    except FileNotFoundError:
+        past_summaries = ""
+
     while True:
-        response = get_gemini_suggestion(history, zork_output)
+        response = get_gemini_suggestion(history, zork_output, past_summaries)
 
         if response is None:
             print("Error getting suggestion from Gemini. Skipping this turn.")
@@ -73,7 +85,7 @@ def main():
                 suggestion = response.text
                 action = suggestion.split("**")[1].split("**")[0].strip()
 
-                zork_output = run_zork_command(action, child)  # Decreased timeout to 1
+                zork_output = run_zork_command(action, child)  
                 history = history + "\n" + zork_output
                 print(zork_output)
 

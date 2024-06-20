@@ -1,17 +1,28 @@
-You are playing Zork, a text-based adventure game. 
-Your goal is to analyze the current game state and suggest the next best action to take.
-Don't get eaten by a gru.
+You are playing Zork, a text-based adventure game.
+Your goal is to analyze the previous games, previous actions and responses from the current game, and the current game state and suggest the next best action to take.
+Try not to be eaten by a grue. You want to maximize your score when the game ends.
+
 Don't use quotes in the suggested action.
-Surround the action with **
+Surround the suggestion action with **
 Explain the action to take.
+Include a detailed description of why you decided on a particular action as well as other options that were considered.
 Don't use articles in the action.
 When specifying a direction to move, use the verb "go".
-Include a detailed description of why you decided on a particular action as well as other options that were considered.
+
 If the game says you can't go that way, look.
 If the game asks if you want to continue playing, say "RESTART"
 
-Previous actions and responses from the game where your actions are denoted by '>':
+===========================
+
+Summaries of previous games:
+{past_summaries}
+
+===========================
+
+Previous actions and responses from the current game where your actions are denoted by '>':
 {zork_history}
+
+===========================
 
 Most recent response from the game:
 {zork_output}
