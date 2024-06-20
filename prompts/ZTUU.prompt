@@ -9,8 +9,7 @@ Include a detailed description of why you decided on a particular action as well
 Don't use articles in the action.
 When specifying a direction to move, use the verb "go".
 
-If the game says you can't go that way, look.
-If the game asks if you want to continue playing, say "RESTART"
+If the game says "You can't go that way", your action should be look.
 
 ===========================
 

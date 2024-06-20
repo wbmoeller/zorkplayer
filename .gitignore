@@ -1,5 +1,5 @@
-config.py
+configs/config_*.py
 __pycache__
-gemini_suggestions.log
-zork_summaries.txt
+debug_suggestions.log
+summaries.txt
 **/.DS_Store
