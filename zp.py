@@ -1,9 +1,9 @@
+import argparse
 import config
 import pexpect
 import logging
 import google.generativeai as genai
 from getch import getch
-import sys
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -53,21 +53,38 @@ def summarize_game(history):
 
     return summary
 
+def aggregate_summaries(summary_file_path):
+    """Asks Gemini to create an aggregate summary of the summaries in the file."""
+
+    with open(summary_file_path, "r") as f:
+        all_summaries = f.read()
+
+    prompt = f"""
+    You are an AI assistant that has been provided with summaries of 10 games of Zork.
+    
+    Summaries:
+    {all_summaries}
+
+    Your task is to analyze these summaries and generate a single, comprehensive summary of the player's overall experience with the game. Include common themes, challenges, successes, and any recurring patterns in the player's actions or decisions.
+    """
+
+    genai.configure(api_key=config.GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    response = model.generate_content(prompt)
+
+    return response.text
+
 # Main game loop
 def main():
-    # Parse command-line arguments
-    interactive_mode = False
-    for arg in sys.argv[1:]:
-        if arg == "-i":
-            interactive_mode = True
-        elif arg == "-h":
-            print("Usage: python zp.py [-i] [-h]")
-            print("-i: Interactive mode. Prompts the user after each turn.")
-            print("-h: Display this help message.")
-            return
+    # Argument parsing
+    parser = argparse.ArgumentParser(description="Play Zork with Gemini AI assistance.")
+    parser.add_argument("-i", "--interactive", action="store_true", help="Interactive mode: prompt after each turn.")
+    args = parser.parse_args()
 
     child = pexpect.spawn(f"dfrotz -m -q {config.ZORK_FILE_PATH}")
-    
+    zork_output = run_zork_command("", child)  # Get initial output
+    history = ""
+
     # Clear the log file at the start
     with open(config.LOG_FILE_PATH, 'w') as log:
         log.write("#################################\n")
@@ -78,12 +95,10 @@ def main():
     try:
         with open(config.SUMMARY_FILE_PATH, 'r') as f:
             past_summaries = f.read()
+            num_summaries = past_summaries.count("-----------")
     except FileNotFoundError:
         past_summaries = ""
-
-    # Get the initial prompt
-    zork_output = run_zork_command("", child)  # Get initial output
-    history = ""
+        num_summaries = 0
 
     while True:
         response = get_gemini_suggestion(history, zork_output, past_summaries)
@@ -107,13 +122,22 @@ def main():
             logging.error(f"Error parsing Gemini response: {e}")
             print("Error processing response. Skipping this turn.")
 
-        # Check for game end
-        if "RESTART" in zork_output or "QUIT" in zork_output:
-            print(summarize_game(history))
+        # Check for game end and enough summaries
+        if ("RESTART" in zork_output or "QUIT" in zork_output): 
+            summary = summarize_game(history)
+            print(summary)
+
+            if num_summaries >= 9:
+                # Aggregate summaries and rewrite file
+                aggregated_summary = aggregate_summaries(config.SUMMARY_FILE_PATH)
+                print(f"\n--------- Reached 10 summaries, aggregating:\n{aggregated_summary}")
+                with open(config.SUMMARY_FILE_PATH, 'w') as f:
+                    f.write(aggregated_summary)
+            
             break
 
         # Ask user if they want to continue (only in interactive mode)
-        if interactive_mode:
+        if args.interactive:  # Check if -i/--interactive flag was used
             print("Continue playing? (n to stop): ", end='', flush=True)
             choice = getch()
             print(choice)
