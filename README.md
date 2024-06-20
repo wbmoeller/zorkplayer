@@ -26,7 +26,7 @@ Todo:
 - Swap from Gemini to OpenAI to see if it does any better
 - Ask gemini for architectural improvements
 - Consider moving the summary into a database
-- I think there's an AI architectural pattern this is implicitly following where the summaries are injected back into the next iteration. Officially separate that out into its own module
+- I think there's an AI architectural pattern (RAG) this is implicitly following where the summaries are injected back into the next iteration. Officially separate that out into its own module
 - Abstract out the game interpreter into a module
 - Generate tests
 
