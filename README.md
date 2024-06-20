@@ -6,14 +6,7 @@ For running locally:
 1) Run with python3
 2) make sure you have a python environement set up with pexpect, google-generativeai, getch
   a) Note: I'm on a mac, so I installed these in a virtual environment. Don't forget to run "source .venv/bin/activate" to get it back
-3) create a local 'config.py' with the following properties:
-  a) GEMINI_API_KEY="key" (The key is generated from the Google AI Studio here https://aistudio.google.com/)
-  b) PROMPT_FILE_PATH = "ZTUU.prompt" (a prompt passed to gemini that contains the previous gameplay and most recent response from the interpreter)
-  c) LOG_FILE_PATH = "gemini_suggestions.log" (file that can be watched to see gemini's thought process)
-  d) ZORK_FILE_PATH = "games/ZTUU.Z5" (a z-code game file that you want to play)
-  e) SUMMARY_PROMPT_FILE_PATH = "summary.prompt" (location of prompt that generates summaries)
-  f) SUMMARY_FILE_PATH = "zork_summaries.txt" (name of where we persist the summaries)
-
+3) make a copy of ./configs/example_config.py to ./configs/config_<game>.py and add the gemini api key
 
 I found the summary of summaries from Gemini to be entertaining:
 > The player's experience with Zork is a consistent pattern of failure, driven by a combination of poor decision-making and a lack of preparation. In every game, the player is tasked by the Grand Inquisitor with exploring the Great Underground Empire (GUE), armed with a useless plastic sword and a brass lantern.
