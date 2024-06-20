@@ -31,7 +31,11 @@ def get_gemini_suggestion(zork_history, zork_output, past_summaries, config):
         response = model.generate_content(prompt)
 
         with open(config.LOG_FILE_PATH, 'a') as log:
-            log.write(f"============ Gemini Suggestion:\n{response.text}\n-------------------\n")
+            log.write(f"============ Gemini Suggestion:\n{response.text}\n")
+
+        # Try including gemini's thought process in the running summary to improve model performance
+        with open(config.SUMMARY_FILE_PATH, 'a') as f:
+            f.write(f"============ Gemini Suggestion:\n{response.text}\n")
 
         return response
     except Exception as e:  
@@ -140,10 +144,10 @@ def main():
 
         # Ask user if they want to continue (only in interactive mode)
         if args.interactive: 
-            print("Continue playing? (n to stop): ", end='', flush=True)
+            print("Continue playing? (y to continue): ", end='', flush=True)
             choice = getch()
             print(choice)
-            if choice.lower() == "n":
+            if choice.lower() != "y":
                 break
 
     child.terminate()
