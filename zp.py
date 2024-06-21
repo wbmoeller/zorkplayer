@@ -10,14 +10,33 @@ import os
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def run_zork_command(command, child):
-    """Runs a command in Frotz using pexpect, with a timeout."""
+def run_zork_command(command, child, config):
+    """Runs a command in Frotz using pexpect, with a timeout. 
+       Returns text after the last '>'.
+    """
     child.sendline(command)
     try:
         child.expect("> ", timeout=1)  
     except pexpect.TIMEOUT:
         print(".")
-    return child.before.decode('utf-8', errors='replace').strip()
+    
+    output = child.before.decode('utf-8', errors='replace')
+
+    # drop the last > because that's the prompt for the next action
+    output_drop_last = output.rsplit(">", 1)
+    output_without_last = output_drop_last[0].strip() if output_drop_last else output
+    
+    # Now get the most recent response from zork
+    output_parts = output_without_last.rsplit(">", 1)
+    
+    # Return the last part or the original output if '>' is not found
+    last_zork_output = output_parts[-1].strip() if output_parts else output_without_last
+            
+    # Drop the first line which is Gemini's most recent action
+    output_lines = last_zork_output.splitlines(keepends=True)[1:]
+    last_zork_output = "".join(output_lines).strip()
+    
+    return last_zork_output
 
 def get_gemini_suggestion(zork_history, zork_output, past_summaries, config):
     """Gets a suggested command from Gemini, incorporating past summaries."""
@@ -31,11 +50,15 @@ def get_gemini_suggestion(zork_history, zork_output, past_summaries, config):
         response = model.generate_content(prompt)
 
         with open(config.LOG_FILE_PATH, 'a') as log:
+            log.write(f"################################\n")
+            log.write(f"################################\n")
+            # log.write(f"=== zork_history:\n{zork_history}\n")
+            log.write(f"=== most recent zork_output:\n{zork_output}\n")
             log.write(f"============ Gemini Suggestion:\n{response.text}\n")
 
         # Try including gemini's thought process in the running summary to improve model performance
-        with open(config.SUMMARY_FILE_PATH, 'a') as f:
-            f.write(f"============ Gemini Suggestion:\n{response.text}\n")
+        # with open(config.SUMMARY_FILE_PATH, 'a') as f:
+        #    f.write(f"============ Gemini Suggestion:\n{response.text}\n")
 
         return response
     except Exception as e:  
@@ -105,7 +128,7 @@ def main():
         num_summaries = 0
 
     # Get the initial prompt
-    zork_output = run_zork_command("", child)  
+    zork_output = run_zork_command("", child, config_module)  
     history = ""
 
     while True:
@@ -122,9 +145,10 @@ def main():
                 suggestion = response.text
                 action = suggestion.split("**")[1].split("**")[0].strip()
 
-                zork_output = run_zork_command(action, child)  
-                history = history + "\n" + zork_output
-                print(zork_output)
+                zork_output = run_zork_command(action, child, config_module)
+                zork_action_and_response = ">" + action + "\n\n" + zork_output
+                history = history + "\n" + zork_action_and_response
+                print(zork_action_and_response)
 
         except Exception as e:
             logging.error(f"Error parsing Gemini response: {e}")
