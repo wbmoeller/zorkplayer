@@ -1,6 +1,8 @@
 import pexpect
 import logging
+import openai
 import google.generativeai as genai
+from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
 from getch import getch
 import sys
 import argparse
@@ -72,82 +74,98 @@ def parse_zork_output(output):
 
     return "\n".join(lines[start_index:]).strip()
 
+def get_ai_response(prompt, config):
+    """Gets a response from the configured AI provider."""
 
-def get_gemini_suggestion(zork_history, zork_output, past_summaries, config, total_input_token_count, total_output_token_count):
-    """Gets a suggested command from Gemini, incorporating past summaries."""
+    try:
+        if config.AI_PROVIDER == "gemini":
+            genai.configure(api_key=config.GEMINI_API_KEY)
+            model = genai.GenerativeModel(config.GEMINI_MODEL)
+            response = model.generate_content(prompt)
+            return response.text
+        elif config.AI_PROVIDER == "openai":
+            openai.api_key = config.OPENAI_API_KEY
+            response = openai.ChatCompletion.create(
+                model=config.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are an expert Zork player."},
+                    {"role": "user", "content": prompt}
+                ],
+            )
+            return response.choices[0].message.content
+        elif config.AI_PROVIDER == "claude":
+            anthropic = Anthropic(api_key=config.CLAUDE_API_KEY)
+            response = anthropic.completions.create(
+                prompt=f"{HUMAN_PROMPT} {prompt}{AI_PROMPT}",
+                model=config.CLAUDE_MODEL,
+                max_tokens_to_sample=100  # Adjust as needed
+            )
+            return response.completion.strip()
+        else:
+            raise ValueError(f"Invalid AI provider: {config.AI_PROVIDER}")
+
+    except Exception as e:
+        logging.error(f"Error generating AI response: {e}")
+        return None
+
+def get_ai_suggestion(zork_history, zork_output, past_summaries, config, total_input_token_count, total_output_token_count):
+    """Gets a suggested command from the configured AI provider."""
     with open(config.PROMPT_FILE_PATH, 'r') as prompt_file:
         prompt_template = prompt_file.read()
     prompt = prompt_template.format(zork_history=zork_history, zork_output=zork_output, past_summaries=past_summaries)
 
-    genai.configure(api_key=config.GEMINI_API_KEY)
-    model = genai.GenerativeModel(config.GEMINI_MODEL)
-    try:
-        response = model.generate_content(prompt)
+    suggestion = get_ai_response(prompt, config)
+            
+    # capture approximate costs into our debug file
+    with open(config.DEBUG_LOG_FILE_PATH, 'a') as debug_file:
+        debug_file.write(f"################################\n")
+        input_token_count = approximate_token_count(config, prompt)
+        total_input_token_count += input_token_count
+        debug_file.write(f"$$$ Input Tokens: ~{input_token_count}\n")
+        debug_file.write(f"$$$ Input Token Total for Game: ~{total_input_token_count}\n")
+        # NOTE: i'm not actually sure if the entire response is counted for output tokens
+        #   or if it's just the output response text. assuming the output text for now
+        output_token_count = approximate_token_count(config, suggestion)
+        total_output_token_count += output_token_count
+        debug_file.write(f"$$$ Output Tokens: ~{output_token_count}\n")
+        debug_file.write(f"$$$ Output Token Total for Game: ~{total_output_token_count}\n")            
+        debug_file.write(f"============ Gemini Suggestion:\n{suggestion}\n")
 
-        # capture approximate costs into our debug file
-        with open(config.DEBUG_LOG_FILE_PATH, 'a') as debug_file:
-            debug_file.write(f"################################\n")
-            input_token_count = approximate_token_count(config, prompt)
-            total_input_token_count += input_token_count
-            debug_file.write(f"$$$ Input Tokens: ~{input_token_count}\n")
-            debug_file.write(f"$$$ Input Token Total for Game: ~{total_input_token_count}\n")
-            # NOTE: i'm not actually sure if the entire response is counted for output tokens
-            #   or if it's just the output response text. assuming the output text for now
-            output_token_count = approximate_token_count(config, response.text)
-            total_output_token_count += output_token_count
-            debug_file.write(f"$$$ Output Tokens: ~{output_token_count}\n")
-            debug_file.write(f"$$$ Output Token Total for Game: ~{total_output_token_count}\n")            
-            debug_file.write(f"============ Gemini Suggestion:\n{response.text}\n")
+    with open(config.AI_SUGGESTIONS_FILE_PATH, 'a') as suggestions_file:
+        suggestions_file.write(f"################################\n")
+        suggestions_file.write(f"################################\n")
+        # suggestions_file.write(f"=== zork_history:\n{zork_history}\n")
+        suggestions_file.write(f"=== most recent zork_output:\n{zork_output}\n")
+        suggestions_file.write(f"============ Gemini Suggestion:\n{suggestion}\n")
 
-        with open(config.AI_SUGGESTIONS_FILE_PATH, 'a') as suggestions_file:
-            suggestions_file.write(f"################################\n")
-            suggestions_file.write(f"################################\n")
-            # suggestions_file.write(f"=== zork_history:\n{zork_history}\n")
-            suggestions_file.write(f"=== most recent zork_output:\n{zork_output}\n")
-            suggestions_file.write(f"============ Gemini Suggestion:\n{response.text}\n")
+    # Try including gemini's thought process in the running summary to improve model performance
+    # Note: this didn't perform much better once i cleaned up the history and most recent response from gemini
+    # with open(config.SUMMARY_FILE_PATH, 'a') as f:
+    #    f.write(f"============ Gemini Suggestion:\n{response.text}\n")
 
-        # Try including gemini's thought process in the running summary to improve model performance
-        # Note: this didn't perform much better once i cleaned up the history and most recent response from gemini
-        # with open(config.SUMMARY_FILE_PATH, 'a') as f:
-        #    f.write(f"============ Gemini Suggestion:\n{response.text}\n")
-
-        return response, total_input_token_count, total_output_token_count
-    except Exception as e:  
-        logging.error(f"Error generating Gemini suggestion: {e}")
-        return None, total_input_token_count, total_output_token_count  
+    return suggestion, total_input_token_count, total_output_token_count
 
 def summarize_game(history, config):
-    """Asks Gemini to summarize the game based on the history."""
-    with open(config.SUMMARY_PROMPT_FILE_PATH, 'r') as f:  
+    """Asks the AI provider to summarize the game based on the history."""
+    with open(config.SUMMARY_PROMPT_FILE_PATH, 'r') as f:
         summary_prompt_template = f.read()
-
     summary_prompt = summary_prompt_template.format(history=history)
-    genai.configure(api_key=config.GEMINI_API_KEY)
-    model = genai.GenerativeModel(config.GEMINI_MODEL)
-    response = model.generate_content(summary_prompt)
+    summary = get_ai_response(summary_prompt, config)
 
-    summary = response.text
     with open(config.SUMMARY_FILE_PATH, 'a') as f:
-        f.write("-----------\n")  
-        f.write(summary + "\n")  
-
+        f.write("-----------\n")
+        f.write(summary + "\n")
     return summary
 
 def aggregate_summaries(config):
-    """Asks Gemini to create an aggregate summary of the summaries in the file."""
+    """Asks the AI provider to create an aggregate summary of the summaries in the file."""
     with open(config.SUMMARY_FILE_PATH, "r") as all_summaries_file:
         all_summaries = all_summaries_file.read()
-
     with open(config.AGGREGATE_SUMMARY_PROMPT_FILE_PATH, "r") as aggregate_summary_prompt_file:
         prompt_template = aggregate_summary_prompt_file.read()
-
     prompt = prompt_template.format(all_summaries=all_summaries)
 
-    genai.configure(api_key=config.GEMINI_API_KEY)
-    model = genai.GenerativeModel(config.GEMINI_MODEL)
-    response = model.generate_content(prompt)
-
-    return response.text
+    return get_ai_response(prompt, config)
 
 def approximate_token_count(config, text):
     """Approximates the number of tokens in a string based on the 3.5 words/token rule."""
@@ -158,7 +176,7 @@ def approximate_token_count(config, text):
 
 # Main game loop
 def main():
-    parser = argparse.ArgumentParser(description="Play Zork with Gemini AI assistance.")
+    parser = argparse.ArgumentParser(description="Play Zork with AI assistance.")
     parser.add_argument("-i", "--interactive", action="store_true", help="Interactive mode: prompt after each turn.")
     parser.add_argument("-c", "--config", default="configs/config.py", help="Path to config.py file (default: configs/config.py)")
     args = parser.parse_args()
@@ -169,25 +187,22 @@ def main():
     spec.loader.exec_module(config)
 
     child = pexpect.spawn(f"dfrotz -m -q {config.ZORK_FILE_PATH}")
-
     new_game_header = """
-        #################################
-        #######  NEW GAME  ###########
-        #################################
-        """
+    #################################
+    #######  NEW GAME  ###########
+    #################################
+    """
 
     # Clear the log file at the start
     with open(config.AI_SUGGESTIONS_FILE_PATH, 'w') as suggestions_file:
         suggestions_file.write(new_game_header)
-
     # Debug counters for cost
     total_input_token_count = 0
     total_output_token_count = 0
-
     # put a marker in our debug log
     with open(config.DEBUG_LOG_FILE_PATH, 'a') as debug_file:
         debug_file.write(new_game_header)
-    
+
     # Read past summaries
     try:
         with open(config.SUMMARY_FILE_PATH, 'r') as all_summaries_file:
@@ -203,26 +218,19 @@ def main():
     history = zork_output
 
     while True:
-        response, total_input_token_count, total_output_token_count = get_gemini_suggestion(history, zork_output, past_summaries, config, total_input_token_count, total_output_token_count)
-
-        if response is None:
-            print("Error getting suggestion from Gemini. Skipping this turn.")
+        suggestion, total_input_token_count, total_output_token_count = get_ai_suggestion(history, zork_output, past_summaries, config, total_input_token_count, total_output_token_count)
+        if suggestion is None:
+            print("Error getting suggestion from AI provider. Skipping this turn.")
             continue
         
         try:
-            if response.candidates[0].finish_reason == "SAFETY":
-                logging.warning(f"Gemini flagged a safety issue:\n{response}")
-            else:
-                suggestion = response.text
-                action = suggestion.split("**")[1].split("**")[0].strip()
-
-                zork_output = run_zork_command(action, child, config)
-                zork_action_and_response = ">" + action + "\n\n" + zork_output
-                history = history + "\n" + zork_action_and_response
-                print(zork_action_and_response)
-
+            action = suggestion.split("**")[1].split("**")[0].strip()
+            zork_output = run_zork_command(action, child, config)
+            zork_action_and_response = ">" + action + "\n\n" + zork_output
+            history = history + "\n" + zork_action_and_response
+            print(zork_action_and_response)
         except Exception as e:
-            logging.error(f"Error parsing Gemini response: {e}")
+            logging.error(f"Error parsing AI response: {e}")
             print("Error processing response. Skipping this turn.")
 
         # Check for game end
@@ -241,18 +249,18 @@ def main():
             choice = getch()
             print(choice)
             if choice.lower() == "y":
-                zork_output = run_zork_command("RESTART", child, config)  # Restart game
-                history = ""  # Reset history for the new game
+                zork_output = run_zork_command("RESTART", child, config) # Restart game
+                history = "" # Reset history for the new game
                 # Clear the log file for the new game
                 with open(config.AI_SUGGESTIONS_FILE_PATH, 'w') as log:
                     log.write("#################################\n")
-                    log.write("#######  NEW GAME  ###########\n")
+                    log.write("#######  NEW GAME  ###########\n")
                     log.write("#################################\n")
             else:
                 break
 
         # Ask user if they want to continue (only in interactive mode)
-        if args.interactive: 
+        if args.interactive:
             print("Continue playing? (y to continue): ", end='', flush=True)
             choice = getch()
             print(choice)

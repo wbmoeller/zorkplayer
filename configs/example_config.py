@@ -2,8 +2,13 @@
 # exclude it from pushes to github (and avoid exposing an api key)
 
 # Configuration
+AI_PROVIDER = "gemini"  # Choose "gemini", "claude" or "openai"
 GEMINI_API_KEY="<ENTER_KEY_HERE>" # API Key for Gemini AI
 GEMINI_MODEL="gemini-1.5-flash" # Gemini model to use
+OPENAI_API_KEY = "<YOUR_OPENAI_API_KEY>"  
+OPENAI_MODEL = "gpt-3.5-turbo"  # Specify your desired OpenAI model
+CLAUDE_API_KEY = "<YOUR_CLAUDE_API_KEY>"
+CLAUDE_MODEL = "claude-2"  # You can use other Claude models as well
 APPROX_WORDS_PER_TOKEN = 3.5 # used for rough calculation of costs, get from ai model documentation
 
 # Game
