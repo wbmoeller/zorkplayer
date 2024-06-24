@@ -26,7 +26,7 @@ Don't use markdown formatting (like * or **) anywhere else in your response.
 
 **Additional Tips:**
 
-* If the most recent response from the game is nothing then look around to see where you are
+* If the most recent response from the game is nothing or just > then look around to see where you are
 * If the game says "You can't go that way." then you've probably gotten confused and should look around to see where you are instead of assuming you know the current location
 * If you're stuck, try revisiting previously explored locations or using a different verb (e.g., `push` instead of `move`).
 * Some actions might require multiple steps (e.g., opening a container before taking an item). Think ahead and plan your actions.

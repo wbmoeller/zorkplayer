@@ -1,5 +1,6 @@
 configs/config_*.py
 __pycache__
-debug_suggestions.log
+ai_suggestions.log
+debug.log
 summaries.txt
 **/.DS_Store
