@@ -4,7 +4,7 @@ As part of the experiment I've written very little of the code myself. I asked G
 
 For running locally:
 1) Run with python3
-2) make sure you have a python environement set up with pexpect, google-generativeai, getch
+2) make sure you have a python environement set up and 'pip install' pexpect, google-generativeai, anthropic, openai, getch
   a) Note: I'm on a mac, so I installed these in a virtual environment. Don't forget to run "source .venv/bin/activate" to get it back
 3) make a copy of ./configs/example_config.py to ./configs/config_<game>.py and add the gemini api key
 
