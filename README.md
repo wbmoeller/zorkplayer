@@ -3,6 +3,15 @@ This project is an experiment using AI (inbitially Gemini) to play a text advent
 
 As part of the experiment I've written very little of the code myself. I asked Gemeni to generate the code in python and iterated, telling it the current error, issue or improvement and then copying the new code. In general it's done a decent job of moving towards a working solution...though if I hear "I'm sorry, you're right." one more time. But, I was able to get Gemini to play Zork with no experience in AI and limited experience with python in under a day.
 
+## Thoughts on AI
+_Disclaimer: I'm early in playing around with building apps with AI and all of my opinions are formed from the latest iteration of Gemini, which isn't the best AI tool for writing code_
+- It was very easy to get started writing a program in a (mostly) unfamiliar language and domain. I described what I wanted to build and it made suggestions and output mostly working code. I could iterate with it when there was a bug or error and improve on the code as we went.
+- It did a very good job of finding tools and libraries to support my project, suggesting the frotz interpreter and writing the code to interface with the AI assistants with ease. I particularly like that it didn't just write the code, but it pointed me at the websites needed to get things set up and the steps I needed to go through with python to configure dependent libraries.
+- As the program got more complicated, gemini started to abreviate the code in the python file (lots of "# ... (same as before)") and i needed to ask gemini to print the entire contents of zp.py pretty often. might be able to solve this with a better initial prompt
+- Once I asked it to re-architect the code into multiple files things went downhill fast. It started mixing in old code (and old bugs) and even completely changing how some of the functions worked with no apparent reason. It also got challenging when I asked to print the contents of a file...because it would apply "code enhancements" to the file each time, which changed interfaces that other files were dependent on.
+- It's pretty fun watching gemini play zork...and it's not very good at it. There are a couple of things that I should be able to fix, like when they go back to a place previously visited gemini thinks that it didn't move while the game thinks they're in the new location. This could be fixed by a better prompt around the current game state...or by having gemini "look" when it gets lost like this.
+- Zork underground seems to be _much_ less forgiving of a game than the original Zork. In Zork the AI will get stuck in an endless loop in the forest or around the canyon. The grues eat the player consistently in Zork Underground.
+
 ## Running Locally
 1. Run with python3
 2. make sure you have a python environement set up and 'pip install' the following libraries
@@ -13,6 +22,7 @@ As part of the experiment I've written very little of the code myself. I asked G
     - getch
   - Note: I'm on a mac, so I installed these in a virtual environment. Don't forget to run "source .venv/bin/activate" to get it back
 3. make a copy of ./configs/example_config.py to ./configs/config_<game>.py and add the key for your APIs. gemini was easy to set up [here](https://aistudio.google.com/)
+4. you can `tail -f ai_suggestions.log` while the game is running to see how gemini comes up with it's actions. sometimes the explanations are priceless :-) 
 
 ## Todo
 - I get a timeout with pexpect every time. haven't dug in yet
