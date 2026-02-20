@@ -5,6 +5,7 @@ from google import genai
 from anthropic import Anthropic
 from getch import getch
 import sys
+import time
 import argparse
 import importlib.util
 import os
@@ -74,29 +75,42 @@ def parse_zork_output(output):
 
     return "\n".join(lines[start_index:]).strip()
 
-def get_ai_response(prompt, config):
+def create_ai_client(config):
+    """Creates and returns an AI client for the configured provider."""
+    if config.AI_PROVIDER == "gemini":
+        return genai.Client(api_key=config.GEMINI_API_KEY)
+    elif config.AI_PROVIDER == "openai":
+        return openai.OpenAI(api_key=config.OPENAI_API_KEY)
+    elif config.AI_PROVIDER == "claude":
+        return Anthropic(api_key=config.CLAUDE_API_KEY)
+    else:
+        raise ValueError(f"Invalid AI provider: {config.AI_PROVIDER}")
+
+def get_ai_response(prompt, config, client):
     """Gets a response from the configured AI provider."""
 
     try:
         if config.AI_PROVIDER == "gemini":
-            client = genai.Client(api_key=config.GEMINI_API_KEY)
-            response = client.models.generate_content(model=config.GEMINI_MODEL, contents=prompt)
+            response = client.models.generate_content(
+                model=config.GEMINI_MODEL,
+                contents=prompt,
+                config={"max_output_tokens": 500}
+            )
             return response.text
         elif config.AI_PROVIDER == "openai":
-            client = openai.OpenAI(api_key=config.OPENAI_API_KEY)
             response = client.chat.completions.create(
                 model=config.OPENAI_MODEL,
                 messages=[
                     {"role": "system", "content": "You are an expert Zork player."},
                     {"role": "user", "content": prompt}
                 ],
+                max_tokens=500,
             )
             return response.choices[0].message.content
         elif config.AI_PROVIDER == "claude":
-            client = Anthropic(api_key=config.CLAUDE_API_KEY)
             response = client.messages.create(
                 model=config.CLAUDE_MODEL,
-                max_tokens=1024,
+                max_tokens=500,
                 messages=[{"role": "user", "content": prompt}]
             )
             return response.content[0].text
@@ -107,14 +121,16 @@ def get_ai_response(prompt, config):
         logging.error(f"Error generating AI response: {e}")
         return None
 
-def get_ai_suggestion(zork_history, zork_output, past_summaries, config, total_input_token_count, total_output_token_count):
+def get_ai_suggestion(zork_history, zork_output, past_summaries, config, client, total_input_token_count, total_output_token_count):
     """Gets a suggested command from the configured AI provider."""
     with open(config.PROMPT_FILE_PATH, 'r') as prompt_file:
         prompt_template = prompt_file.read()
     prompt = prompt_template.format(zork_history=zork_history, zork_output=zork_output, past_summaries=past_summaries)
 
-    suggestion = get_ai_response(prompt, config)
-            
+    start = time.time()
+    suggestion = get_ai_response(prompt, config, client)
+    print(f"[history: {len(zork_history)} chars | response: {len(suggestion)} chars | time: {time.time() - start:.1f}s]")
+
     # capture approximate costs into our debug file
     with open(config.DEBUG_LOG_FILE_PATH, 'a') as debug_file:
         debug_file.write(f"################################\n")
@@ -144,19 +160,19 @@ def get_ai_suggestion(zork_history, zork_output, past_summaries, config, total_i
 
     return suggestion, total_input_token_count, total_output_token_count
 
-def summarize_game(history, config):
+def summarize_game(history, config, client):
     """Asks the AI provider to summarize the game based on the history."""
     with open(config.SUMMARY_PROMPT_FILE_PATH, 'r') as f:
         summary_prompt_template = f.read()
     summary_prompt = summary_prompt_template.format(history=history)
-    summary = get_ai_response(summary_prompt, config)
+    summary = get_ai_response(summary_prompt, config, client)
 
     with open(config.SUMMARY_FILE_PATH, 'a') as f:
         f.write("-----------\n")
         f.write(summary + "\n")
     return summary
 
-def aggregate_summaries(config):
+def aggregate_summaries(config, client):
     """Asks the AI provider to create an aggregate summary of the summaries in the file."""
     with open(config.SUMMARY_FILE_PATH, "r") as all_summaries_file:
         all_summaries = all_summaries_file.read()
@@ -164,7 +180,7 @@ def aggregate_summaries(config):
         prompt_template = aggregate_summary_prompt_file.read()
     prompt = prompt_template.format(all_summaries=all_summaries)
 
-    return get_ai_response(prompt, config)
+    return get_ai_response(prompt, config, client)
 
 def approximate_token_count(config, text):
     """Approximates the number of tokens in a string based on the 3.5 words/token rule."""
@@ -190,6 +206,7 @@ def main():
     config = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config)
 
+    client = create_ai_client(config)
     child = pexpect.spawn(f"dfrotz -m -q {config.ZORK_FILE_PATH}")
     new_game_header = """
     #################################
@@ -222,7 +239,7 @@ def main():
     history = zork_output
 
     while True:
-        suggestion, total_input_token_count, total_output_token_count = get_ai_suggestion(history, zork_output, past_summaries, config, total_input_token_count, total_output_token_count)
+        suggestion, total_input_token_count, total_output_token_count = get_ai_suggestion(history, zork_output, past_summaries, config, client, total_input_token_count, total_output_token_count)
         if suggestion is None:
             print("Error getting suggestion from AI provider. Skipping this turn.")
             continue
@@ -239,12 +256,12 @@ def main():
 
         # Check for game end
         if "RESTART" in zork_output or "QUIT" in zork_output:
-            summary = summarize_game(history, config)
+            summary = summarize_game(history, config, client)
             print(summary)
-            
+
             # Only aggregate summaries if there are enough
             if num_summaries >= 9:
-                aggregated_summary = aggregate_summaries(config)
+                aggregated_summary = aggregate_summaries(config, client)
                 with open(config.SUMMARY_FILE_PATH, 'w') as f:
                     f.write(aggregated_summary)
 
