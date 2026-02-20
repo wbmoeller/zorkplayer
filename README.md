@@ -1,9 +1,15 @@
 # Zork Player
-This project is an experiment using AI (inbitially Gemini) to play a text adventure. It uses an interpreter for the old infocom games (frotz) and passes text back and forth between the interpreter and Gemini.
+This project is an experiment using AI (initially Gemini) to play a text adventure. It uses an interpreter for the old infocom games (frotz) and passes text back and forth between the interpreter and Gemini.
 
 As part of the experiment I've written very little of the code myself. I asked Gemeni to generate the code in python and iterated, telling it the current error, issue or improvement and then copying the new code. In general it's done a decent job of moving towards a working solution...though if I hear "I'm sorry, you're right." one more time. But, I was able to get Gemini to play Zork with no experience in AI and limited experience with python in under a day.
 
 ## Thoughts on AI
+Feb 19, 2026
+- It's pretty interesting, after updating the project to use gemini-3.0-flash...it plays the game decently. It makes appropriate decisions, doesn't seem to get stuck in loops, in 30 moves it got 40 points.
+- Claude Code did a great job analyzing this old project and making quick updates. Even spotted a bug in the pexpect matching.
+- I'm curious to start using Claude Code to clean the project up. At the time I was using gemini to write the code and it fell to pieces. But that was before agentic ai - i started using windsurf a few months later and it was a game changer.
+
+(Keeping this for posterity - written around Nov 2024)
 _Disclaimer: I'm early in playing around with building apps with AI and all of my opinions are formed from the latest iteration of Gemini, which isn't the best AI tool for writing code_
 - It was very easy to get started writing a program in a (mostly) unfamiliar language and domain. I described what I wanted to build and it made suggestions and output mostly working code. I could iterate with it when there was a bug or error and improve on the code as we went.
 - It did a very good job of finding tools and libraries to support my project, suggesting the frotz interpreter and writing the code to interface with the AI assistants with ease. I particularly like that it didn't just write the code, but it pointed me at the websites needed to get things set up and the steps I needed to go through with python to configure dependent libraries.
@@ -16,7 +22,7 @@ _Disclaimer: I'm early in playing around with building apps with AI and all of m
 1. Run with python3
 2. make sure you have a python environement set up and 'pip install' the following libraries
     - pexpect
-    - google-generativeai
+    - google-genai
     - anthropic
     - openai
     - getch
