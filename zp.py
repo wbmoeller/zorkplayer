@@ -1,8 +1,8 @@
 import pexpect
 import logging
 import openai
-import google.generativeai as genai
-from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
+from google import genai
+from anthropic import Anthropic
 from getch import getch
 import sys
 import argparse
@@ -21,7 +21,7 @@ import os
 # - start scoring the AI models based on the score it reached, number of rounds, (?)
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def run_zork_command(command, child, config):
     """Runs a command in Frotz using pexpect, with a timeout. 
@@ -32,7 +32,7 @@ def run_zork_command(command, child, config):
 
 def get_last_zork_output(child, config):
     try:
-        child.expect("> ", timeout=1)  
+        child.expect(">", timeout=5)
     except pexpect.TIMEOUT:
         print(".")
     
@@ -79,13 +79,12 @@ def get_ai_response(prompt, config):
 
     try:
         if config.AI_PROVIDER == "gemini":
-            genai.configure(api_key=config.GEMINI_API_KEY)
-            model = genai.GenerativeModel(config.GEMINI_MODEL)
-            response = model.generate_content(prompt)
+            client = genai.Client(api_key=config.GEMINI_API_KEY)
+            response = client.models.generate_content(model=config.GEMINI_MODEL, contents=prompt)
             return response.text
         elif config.AI_PROVIDER == "openai":
-            openai.api_key = config.OPENAI_API_KEY
-            response = openai.ChatCompletion.create(
+            client = openai.OpenAI(api_key=config.OPENAI_API_KEY)
+            response = client.chat.completions.create(
                 model=config.OPENAI_MODEL,
                 messages=[
                     {"role": "system", "content": "You are an expert Zork player."},
@@ -94,13 +93,13 @@ def get_ai_response(prompt, config):
             )
             return response.choices[0].message.content
         elif config.AI_PROVIDER == "claude":
-            anthropic = Anthropic(api_key=config.CLAUDE_API_KEY)
-            response = anthropic.completions.create(
-                prompt=f"{HUMAN_PROMPT} {prompt}{AI_PROMPT}",
+            client = Anthropic(api_key=config.CLAUDE_API_KEY)
+            response = client.messages.create(
                 model=config.CLAUDE_MODEL,
-                max_tokens_to_sample=100  # Adjust as needed
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}]
             )
-            return response.completion.strip()
+            return response.content[0].text
         else:
             raise ValueError(f"Invalid AI provider: {config.AI_PROVIDER}")
 
@@ -182,6 +181,11 @@ def main():
     args = parser.parse_args()
 
     # Load config module dynamically
+    if not os.path.exists(args.config):
+        parser.print_usage()
+        print(f"error: config file not found: {args.config}")
+        print(f"       copy configs/example_config.py to {args.config} and fill in your API keys.")
+        sys.exit(1)
     spec = importlib.util.spec_from_file_location("config", args.config)
     config = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config)
